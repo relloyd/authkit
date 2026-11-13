@@ -12,7 +12,7 @@ Status: a plan, not yet carried out. Written November 2026 against authkit as fi
 
 ## Before starting
 
-1. **Publish authkit.** Push `github.com/relloyd/authkit` (public) and tag `v0.1.0`. derp's Docker build runs `go mod download` with the service directory as its context, so the module must be fetchable from the proxy; a public repo needs no `GOPRIVATE` or credentials in the Dockerfile or CI.
+1. **Check authkit has a release.** `github.com/relloyd/authkit` is public and its release workflow tags `main` on merge; the first release is `v0.1.0`. Use the latest tag. derp's Docker build runs `go mod download` with the service directory as its context, so the module must be fetchable from the proxy; a public repo needs no `GOPRIVATE` or credentials in the Dockerfile or CI.
 2. **Back up derp's database** (`task backup` in `derp/`). Stage 1's migration cannot be undone except by restoring.
 3. **Answer the investigation's open questions** that affect this plan: invite-only or open sign-up (`AUTH_SIGNUP`), and whether the hourly backup sidecar goes in before other people's history is on the Pi.
 

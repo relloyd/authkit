@@ -176,3 +176,16 @@ task ci      # the PR checks: gofmt, vet, tidy, govulncheck, tests with -race
 task lint    # golangci-lint
 task run     # the example app in dev mode
 ```
+
+### Releases
+
+Merging a pull request into `main` tags and publishes a release when the pull request title calls for one (`.github/workflows/release.yml`):
+
+| Pull request title starts with | Release |
+|---|---|
+| `feat:` | minor (`v0.1.0` to `v0.2.0`) |
+| `fix:` or `perf:` | patch (`v0.1.0` to `v0.1.1`) |
+| `type!:` or a `BREAKING CHANGE:` line in the body | minor while the version is `0.x`; major after `1.0` |
+| `docs:`, `chore:`, `ci:`, `test:`, `refactor:` and anything else | none |
+
+Dependabot's Go updates are titled `fix(deps):`, so merging one releases a patch built against the updated dependencies. To release by hand, run the **release** workflow from the Actions tab and choose the bump. An app picks up a release with `go get github.com/relloyd/authkit@latest`.
