@@ -1,0 +1,32 @@
+# Dependabot version updates, the same in every repo: weekly, one grouped PR per
+# ecosystem to keep CI runs down.
+#
+# - github-actions: bumps the SHA-pinned actions and their "# vX.Y.Z" comments together.
+# - gomod: bumps Go module requirements. This package's dependencies are its attack
+#   surface (oauth2, go-oidc, go-jose), so merge these promptly and then bump authkit
+#   in each app that uses it.
+#
+# Security updates (separate PRs for advisories) are a repo setting, not part of this
+# file: Settings > Code security > Dependabot alerts and security updates.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]
+    commit-message:
+      prefix: fix
+      include: scope

@@ -1,0 +1,66 @@
+{{define "head"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>authkit example</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 34rem; margin: 3rem auto; padding: 0 1rem; }
+  nav { display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; }
+  nav form { margin-left: auto; }
+  .provider { display: block; padding: .7rem 1rem; margin: .6rem 0; border: 1px solid; border-radius: .5rem;
+              text-align: center; text-decoration: none; color: inherit; font-weight: 600; }
+  .error { padding: .6rem 1rem; border-left: 4px solid #c33; }
+  button { font: inherit; padding: .3rem .8rem; }
+  code { font-size: .9em; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/">Home</a>
+  <a href="/app">App</a>
+  <a href="/admin">Admin</a>
+  {{if .User}}
+  <form method="post" action="/auth/logout"><button>Sign out</button></form>
+  {{else}}
+  <a href="/login" style="margin-left:auto">Sign in</a>
+  {{end}}
+</nav>
+{{end}}
+
+{{define "foot"}}</body></html>{{end}}
+
+{{define "home"}}{{template "head" .}}
+<h1>authkit example</h1>
+<p>This page is public.
+{{if .User}}You are signed in as <strong>{{.User.Email}}</strong>.{{else}}You are not signed in.{{end}}</p>
+<p><a href="/app">/app</a> needs a signed-in user. <a href="/admin">/admin</a> needs the <code>admin</code> role.
+<a href="/auth/me">/auth/me</a> is the signed-in user as JSON.</p>
+{{template "foot"}}{{end}}
+
+{{define "login"}}{{template "head" .}}
+<h1>Sign in</h1>
+{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+{{if .User}}
+<p>You are already signed in as <strong>{{.User.Email}}</strong>. <a href="/app">Go to the app</a>.</p>
+{{else}}
+{{range .Providers}}
+<a class="provider" href="{{.LoginURL}}{{if $.Return}}?return={{$.Return}}{{end}}">Continue with {{.Label}}</a>
+{{else}}
+<p>No sign-in providers are configured. Set <code>AUTH_MODE=session</code> with Google or GitHub credentials,
+or <code>AUTH_MODE=dev</code> to run as a fixed user.</p>
+{{end}}
+{{end}}
+{{template "foot"}}{{end}}
+
+{{define "app"}}{{template "head" .}}
+<h1>App</h1>
+<p>Only signed-in users see this. You are <strong>{{.User.Name}}</strong> ({{.User.Email}}), user {{.User.ID}}.</p>
+<p>Roles: {{range .User.Roles}}<code>{{.}}</code> {{else}}none{{end}}</p>
+{{template "foot"}}{{end}}
+
+{{define "admin"}}{{template "head" .}}
+<h1>Admin</h1>
+<p>Only users with the <code>admin</code> role see this. Hello, {{.User.Email}}.</p>
+{{template "foot"}}{{end}}

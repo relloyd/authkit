@@ -1,0 +1,100 @@
+# `task ci` runs the same checks as the PR checks workflow; `task --list` shows the rest.
+version: '3'
+
+set: [pipefail, errexit]
+
+vars:
+  # Bump deliberately; see https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck?tab=versions
+  GOVULNCHECK_VERSION: v1.9.0
+
+tasks:
+  fmt:
+    desc: Format all Go source files
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: Run go vet on all packages
+    cmds:
+      - go vet ./...
+
+  check:
+    desc: Run go fmt and go vet
+    cmds:
+      - task: fmt
+      - task: vet
+
+  test:
+    desc: Run all tests (fake Google, GitHub and Cloudflare Access; no network or credentials needed)
+    deps: [check]
+    cmds:
+      - go test ./... -count=1
+
+  lint:
+    desc: Run golangci-lint (extra flags after --, e.g. task lint -- --new-from-merge-base=origin/main)
+    cmds:
+      - golangci-lint run {{.CLI_ARGS}} ./...
+
+  fmt-check:
+    desc: Fail if any Go files need gofmt (reports only; does not rewrite files)
+    cmds:
+      - |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          echo "These files need gofmt (run task fmt):"
+          echo "$unformatted"
+          exit 1
+        fi
+
+  tidy-check:
+    desc: Fail if go.mod/go.sum are not tidy
+    cmds:
+      - go mod tidy -diff
+
+  vuln:
+    desc: Report known vulnerabilities (Go vulndb) reachable from this module's code, including the Go standard library
+    cmds:
+      - go run golang.org/x/vuln/cmd/govulncheck@{{.GOVULNCHECK_VERSION}} ./...
+
+  ci:
+    desc: Non-mutating checks for CI (gofmt, vet, go.mod tidiness, govulncheck, race-enabled tests)
+    cmds:
+      - task: fmt-check
+      - task: vet
+      - task: tidy-check
+      - task: vuln
+      - go test ./... -count=1 -race
+
+  build:
+    desc: Build the example app to bin/
+    cmds:
+      - go build -trimpath -o bin/example ./example
+
+  run:
+    desc: Run the example app on http://localhost:8080 as a fixed dev user (no provider credentials needed)
+    summary: |
+      Run the example app with the development authenticator
+
+      Every request is signed in as dev@example.test with the admin role, so the
+      protected page and the admin page both open. The database is bin/example.db.
+
+      To try real sign-in instead, create the OAuth clients as the README describes,
+      with callback URLs http://localhost:8080/auth/callback/google and
+      http://localhost:8080/auth/callback/github, then:
+
+        AUTH_MODE=session AUTH_BASE_URL=http://localhost:8080 AUTH_SIGNUP=open \
+        AUTH_GITHUB_CLIENT_ID=... AUTH_GITHUB_CLIENT_SECRET=... \
+        DB_PATH=bin/example.db ./bin/example
+    deps: [build]
+    env:
+      AUTH_MODE: dev
+      AUTH_DEV_USER: dev@example.test
+      AUTH_DEV_ROLES: admin
+      DB_PATH: bin/example.db
+    cmds:
+      - ./bin/example
+
+  clean:
+    desc: Remove build artifacts (including the example's database)
+    cmds:
+      - rm -rf bin/

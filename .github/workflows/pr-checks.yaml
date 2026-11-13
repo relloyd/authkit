@@ -1,0 +1,100 @@
+# PR checks for authkit.
+#
+# Every check is a go-task target, so anything that fails here can be reproduced
+# locally with the same command:
+#
+#   task ci
+#   task lint -- --new-from-merge-base=origin/main
+#
+# Mark the "PR checks" job as the required status check in branch protection: it
+# rolls up every other job.
+#
+# Actions are pinned to full commit SHAs (a tag can be moved to different code; a SHA
+# cannot), with the release tag in a trailing comment. Dependabot reads that comment
+# and bumps both together (.github/dependabot.yml).
+
+name: PR checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: # run everything on demand, e.g. after bumping GO_VERSION
+  schedule:
+    # Weekly govulncheck-only run so advisories published since the last change are
+    # reported even when no PRs are open. Mondays 06:23 UTC.
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # Supersede stale PR runs, but let every main run finish so its caches get saved.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GO_VERSION: "1.27.x"
+  # When bumping, update the checksum from task_checksums.txt (task_linux_amd64.tar.gz)
+  # on the matching release at https://github.com/go-task/task/releases.
+  TASK_VERSION: "3.54.0"
+  TASK_CHECKSUM: "680859dbb4d881a9c72d4d9a8f510825450849af8567deacd7302c01124416fb"
+  GOLANGCI_LINT_VERSION: "v2.15.0"
+
+jobs:
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # golangci-lint diffs against the merge base with the target branch
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          check-latest: true
+
+      - uses: go-task/setup-task@a00fbb05ce67b35648be3c78cbc9fd85354c757e # v2.2.0
+        with:
+          version: ${{ env.TASK_VERSION }}
+          checksum: ${{ env.TASK_CHECKSUM }}
+
+      - name: gofmt, go vet, go mod tidy, govulncheck, tests (-race)
+        if: github.event_name != 'schedule'
+        run: task ci
+
+      - name: govulncheck (weekly scheduled run)
+        if: github.event_name == 'schedule'
+        run: task vuln
+
+      - name: Build the example app
+        if: github.event_name != 'schedule'
+        run: task build
+
+      - if: github.event_name != 'schedule'
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          install-only: true
+
+      # Existing findings are tolerated; anything a PR introduces fails the build.
+      - name: golangci-lint (new issues only)
+        if: github.event_name != 'schedule'
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: task lint -- --new-from-merge-base="origin/$BASE_REF"
+
+  pr-checks:
+    name: PR checks
+    if: always()
+    needs: [go]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any check failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more checks did not pass: ${{ join(needs.*.result, ', ') }}"
+          exit 1
