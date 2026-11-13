@@ -33,4 +33,5 @@ task run         # example app on http://localhost:8080 as a fixed dev user
 - Secrets use the `Secret` type so they cannot be printed. Never log a token, code, state, verifier or cookie value; `TestLogsHoldNoSecrets` guards the common paths.
 - Changing a table means a new numbered file in `sqlitestore/migrations/`; never edit an applied one. A new `Store` method is a breaking change for apps that implement their own store.
 - The README configuration table and the doc comment on `ConfigFromEnv` must match `env.go`.
+- Releases are cut by `.github/workflows/release.yml` from pull request titles on merge to `main`: `feat:` is a minor version, `fix:` and `perf:` a patch, anything else none. Title pull requests accordingly, and never tag by hand. `.github/scripts/next-version.sh` is the same script as in prutil, filetree and todotil; keep them identical.
 - Provider names (`google`, `github`, `cloudflare-access`, `dev`) are stored in the identities table. Renaming one orphans every identity that used it.
